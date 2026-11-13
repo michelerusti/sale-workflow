@@ -76,6 +76,30 @@ class TestSalePrices(SaleCommon):
         self.assertEqual(line.price_unit, 20)
         self.assertEqual(line.price_subtotal, 10.08)
 
+    def test_percentage_discount_shown_rounding(self):
+        """The first discount of the line is the discount of the rule
+        even when the combination of the discounts has more decimals
+        than the precision of the discounts.
+        """
+        # Arrange
+        self._create_rule(
+            compute_price="percentage",
+            percent_price=10,
+            discount2=5,
+            discount3=3,
+        )
+
+        # Act
+        line = self._add_order_line()
+
+        # Assert
+        self.assertEqual(line.discount1, 10)
+        self.assertEqual(line.discount2, 5)
+        self.assertEqual(line.discount3, 3)
+        self.assertAlmostEqual(line.discount, 17.065)
+        self.assertEqual(line.price_unit, 20)
+        self.assertEqual(line.price_subtotal, 16.59)
+
     def test_percentage_discount_hidden(self):
         """A percentage Discount Rule does not propagate the discounts
         to the sale order line when the discounts are hidden:

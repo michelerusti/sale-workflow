@@ -34,6 +34,20 @@ class SaleOrderLine(models.Model):
         precompute=True,
     )
 
+    def _get_pricelist_discount_unrounded(self):
+        """Return the discount of the pricelist rule, not rounded.
+
+        The discount computed by Odoo is rounded to the precision of the discounts,
+        splitting it would propagate the rounding error to the first discount.
+        """
+        self.ensure_one()
+        line = self.with_company(self.company_id)
+        base_price = line._get_pricelist_price_before_discount()
+        if not base_price:
+            return self.discount1
+        pricelist_price = line._get_pricelist_price()
+        return (base_price - pricelist_price) / base_price * 100
+
     def _compute_discount1(self):
         # super() sets in discount1 the whole discount of the pricelist rule,
         # that is the combination of the three discounts of the rule:
@@ -46,12 +60,13 @@ class SaleOrderLine(models.Model):
                 and not line.combo_item_id
                 and price_rule._show_discount()
             ):
-                total = line.discount1
-                extra = (1 - price_rule.discount2 / 100) * (
-                    1 - price_rule.discount3 / 100
-                )
-                if extra:
-                    line.discount1 = 100 * (1 - (1 - total / 100) / extra)
+                if price_rule._has_extra_discounts():
+                    total = line._get_pricelist_discount_unrounded()
+                    extra = (1 - price_rule.discount2 / 100) * (
+                        1 - price_rule.discount3 / 100
+                    )
+                    if extra:
+                        line.discount1 = 100 * (1 - (1 - total / 100) / extra)
                 line.discount2 = price_rule.discount2
                 line.discount3 = price_rule.discount3
             else:
